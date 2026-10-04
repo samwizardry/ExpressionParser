@@ -16,14 +16,34 @@ internal static class ExpressionParser
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // Множество поддерживаемых операторов сравнения и логики
-    private static readonly HashSet<string> Operators =
-        ["and", "or", "not", "eq", "ne", "lt", "lte", "gt", "gte", "before", "beforeeq", "after", "aftereq", "contain", "start", "end"];
+    private static readonly HashSet<string> Operators = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "And",
+        "Or",
+        "Not",
+        "Eq",
+        "Neq",
+        "Lt",
+        "Leq",
+        "Gt",
+        "Geq",
+        "Contains",
+        "StartsWith",
+        "EndsWith"
+    };
 
     // Поддерживаемые логические константы
-    private static readonly HashSet<string> Literals = ["true", "false"];
+    private static readonly HashSet<string> Literals = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "true",
+        "false"
+    };
 
     // Поддерживаемые ключевые слова
-    private static readonly HashSet<string> Keywords = ["null"];
+    private static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "null"
+    };
 
     // Рефлексивное получение строковых методов для трансляции в SQL
     private static readonly MethodInfo ContainsMethod = typeof(string).GetMethod("Contains", [typeof(string)])!;
@@ -31,24 +51,20 @@ internal static class ExpressionParser
     private static readonly MethodInfo EndsWithMethod = typeof(string).GetMethod("EndsWith", [typeof(string)])!;
 
     // Приоритеты операторов для построения дерева выражений
-    private static readonly Dictionary<string, int> Precedence = new()
+    private static readonly Dictionary<string, int> Precedence = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "or", 0 },
-        { "and", 1 },
-        { "eq", 10 },
-        { "ne", 10 },
-        { "lt", 10 },
-        { "lte", 10 },
-        { "gt", 10 },
-        { "gte", 10 },
-        { "after", 10 },
-        { "aftereq", 10 },
-        { "before", 10 },
-        { "beforeeq", 10 },
-        { "contains", 20 },
-        { "starts", 20 },
-        { "ends", 20 },
-        { "not", 100 }
+        { "Or", 0 },
+        { "And", 1 },
+        { "Eq", 10 },
+        { "Neq", 10 },
+        { "Lt", 10 },
+        { "Leq", 10 },
+        { "Gt", 10 },
+        { "Geq", 10 },
+        { "Contains", 20 },
+        { "StartsWith", 20 },
+        { "EndsWith", 20 },
+        { "Not", 100 }
     };
 
     // Процедуры обработки токенов в зависимости от их типа
@@ -60,42 +76,38 @@ internal static class ExpressionParser
         { TokenType.Keyword, ProceedKeyword }
     };
 
-    // Кэшированные константные выражения для булевых литералов
-    private static readonly Dictionary<string, ConstantExpression> LiteralExpressions = new()
+    // Кешированные константные выражения для булевых литералов
+    private static readonly Dictionary<string, ConstantExpression> LiteralExpressions = new(StringComparer.OrdinalIgnoreCase)
     {
         { "true", Expression.Constant(true, typeof(bool)) },
         { "false", Expression.Constant(false, typeof(bool)) }
     };
 
     // Словарь функций построения выражений по операторам
-    private static readonly Dictionary<string, Func<Stack<Expression>, Expression>> OperatorFunctions = new()
+    private static readonly Dictionary<string, Func<Stack<Expression>, Expression>> OperatorFunctions = new(StringComparer.OrdinalIgnoreCase)
     {
-        { "and", And },
-        { "or", Or },
-        { "not", Not },
-        { "eq", Eq },
-        { "ne", Neq },
-        { "lt", Lt },
-        { "lte", Leq },
-        { "gt", Gt },
-        { "gte", Geq },
-        { "before", Lt },
-        { "beforeeq", Leq },
-        { "after", Gt },
-        { "aftereq", Geq },
-        { "contains", Contains },
-        { "starts", StartsWith },
-        { "ends", EndsWith }
+        { "And", And },
+        { "Or", Or },
+        { "Not", Not },
+        { "Eq", Eq },
+        { "Neq", Neq },
+        { "Lt", Lt },
+        { "Leq", Leq },
+        { "Gt", Gt },
+        { "Geq", Geq },
+        { "Contains", Contains },
+        { "StartsWith", StartsWith },
+        { "EndsWith", EndsWith }
     };
 
-    // Кэшированные константные выражения для ключевых слов
-    private static readonly Dictionary<string, ConstantExpression> KeywordExpressions = new()
+    // Кешированные константные выражения для ключевых слов
+    private static readonly Dictionary<string, ConstantExpression> KeywordExpressions = new(StringComparer.OrdinalIgnoreCase)
     {
         { "null", Expression.Constant(null) }
     };
 
     // Фабрики для конвертации констант во внутренние типы C#
-    private static readonly Dictionary<string, Func<ConstantExpression, ConstantExpression>> IdentifierTypeConstantExpressions = new()
+    private static readonly Dictionary<string, Func<ConstantExpression, ConstantExpression>> IdentifierTypeConstantExpressions = new(StringComparer.OrdinalIgnoreCase)
     {
         { "Int8", ToInt8ConstantExpression },
         { "Nullable`1Int8", ToNullableInt8ConstantExpression },
@@ -145,19 +157,19 @@ internal static class ExpressionParser
                 tokens.Enqueue(new Token(representation, TokenType.Literal, LiteralType.Numeric));
             }
             // Если токен — булево значение
-            else if (Literals.Contains(representation.ToLower()))
+            else if (Literals.Contains(representation))
             {
-                tokens.Enqueue(new Token(representation.ToLower(), TokenType.Literal, LiteralType.Boolean));
+                tokens.Enqueue(new Token(representation, TokenType.Literal, LiteralType.Boolean));
             }
             // Если токен — системное ключевое слово
-            else if (Keywords.Contains(representation.ToLower()))
+            else if (Keywords.Contains(representation))
             {
-                tokens.Enqueue(new Token(representation.ToLower(), TokenType.Keyword));
+                tokens.Enqueue(new Token(representation, TokenType.Keyword));
             }
             // Если токен — один из операторов сравнения или логики
-            else if (Operators.Contains(representation.ToLower()))
+            else if (Operators.Contains(representation))
             {
-                var token = new Token(representation.ToLower(), TokenType.Operator);
+                var token = new Token(representation, TokenType.Operator);
 
                 // Выталкиваем из стека операторы с большим или равным приоритетом
                 while (operators.Count != 0 && operators.Peek().Representation != "(")
