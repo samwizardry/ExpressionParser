@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="ExpressionParser.Benchmark/ExpressionParser.Benchmark.csproj" />
+  <Project Path="ExpressionParser.Tests/ExpressionParser.Tests.csproj" />
+  <Project Path="ExpressionParser/ExpressionParser.csproj" />
+</Solution>
