@@ -13,23 +13,6 @@ internal static partial class ExpressionParser
     // Паттерн для распознавания числовых литералов
     private static readonly Regex s_numberRegex = NumberRegex();
 
-    // Множество поддерживаемых операторов сравнения и логики
-    private static readonly HashSet<string> Operators = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "And",
-        "Or",
-        "Not",
-        "Eq",
-        "Neq",
-        "Lt",
-        "Leq",
-        "Gt",
-        "Geq",
-        "Contains",
-        "StartsWith",
-        "EndsWith"
-    };
-
     // Рефлексивное получение строковых методов для трансляции в SQL
     private static readonly MethodInfo ContainsMethod = typeof(string).GetMethod("Contains", [typeof(string)])!;
     private static readonly MethodInfo StartsWithMethod = typeof(string).GetMethod("StartsWith", [typeof(string)])!;
@@ -40,45 +23,32 @@ internal static partial class ExpressionParser
     private static readonly ConstantExpression TrueConstant = Expression.Constant(true, typeof(bool));
     private static readonly ConstantExpression FalseConstant = Expression.Constant(false, typeof(bool));
 
-    // Приоритеты операторов для построения дерева выражений
-    private static readonly Dictionary<string, int> Precedence = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "Or", 0 },
-        { "And", 1 },
-        { "Eq", 10 },
-        { "Neq", 10 },
-        { "Lt", 10 },
-        { "Leq", 10 },
-        { "Gt", 10 },
-        { "Geq", 10 },
-        { "Contains", 20 },
-        { "StartsWith", 20 },
-        { "EndsWith", 20 },
-        { "Not", 100 }
-    };
-
-    // Словарь функций построения выражений по операторам
-    private static readonly Dictionary<string, Func<Stack<Expression>, Expression>> OperatorFunctions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "And", And },
-        { "Or", Or },
-        { "Not", Not },
-        { "Eq", Eq },
-        { "Neq", Neq },
-        { "Lt", Lt },
-        { "Leq", Leq },
-        { "Gt", Gt },
-        { "Geq", Geq },
-        { "Contains", Contains },
-        { "StartsWith", StartsWith },
-        { "EndsWith", EndsWith }
-    };
-
     [GeneratedRegex(@"\b[\p{L}_][\p{L}0-9_]*\b|'(?:''|[^'])*'|[-+]?\d*\.?\d+|[()]", RegexOptions.IgnoreCase)]
     private static partial Regex TokenizerRegex();
 
     [GeneratedRegex(@"^[-+]?\d*\.?\d+$")]
     private static partial Regex NumberRegex();
+
+    private static int GetOperatorPrecedence(Operator @operator)
+    {
+        switch (@operator)
+        {
+            case Operator.And: return 1;
+            case Operator.Or: return 0;
+            case Operator.Not: return 100;
+            case Operator.Eq: return 10;
+            case Operator.Neq: return 10;
+            case Operator.Lt: return 10;
+            case Operator.Leq: return 10;
+            case Operator.Gt: return 10;
+            case Operator.Geq: return 10;
+            case Operator.Contains: return 20;
+            case Operator.StartsWith: return 20;
+            case Operator.EndsWith: return 20;
+            default:
+                throw new NotSupportedException($"Unsupported operator: {@operator}");
+        }
+    }
 
     /// <summary>
     /// Токенизация выражения с использованием алгоритма Дейкстры (Shunting-Yard)
@@ -118,14 +88,15 @@ internal static partial class ExpressionParser
                 tokens.Enqueue(new Token(representation, TokenType.Keyword));
             }
             // Если токен — один из операторов сравнения или логики
-            else if (Operators.Contains(representation))
+            //else if (Operators.Contains(representation))
+            else if (Enum.TryParse(value: representation, ignoreCase: true, out Operator @operator))
             {
-                var token = new Token(representation, TokenType.Operator);
+                var token = new Token(representation, TokenType.Operator, LiteralType.None, @operator);
 
                 // Выталкиваем из стека операторы с большим или равным приоритетом
                 while (operators.Count != 0 && operators.Peek().Representation != "(")
                 {
-                    if (Precedence[operators.Peek().Representation] >= Precedence[token.Representation])
+                    if (GetOperatorPrecedence(operators.Peek().Operator) >= GetOperatorPrecedence(token.Operator))
                     {
                         tokens.Enqueue(operators.Pop());
                     }
@@ -231,7 +202,45 @@ internal static partial class ExpressionParser
     // Обработка оператора (извлекает выражение оператора на основе OperatorFunctions)
     private static void ProceedOperator(Stack<Expression> expressions, ParameterExpression parameter, Token token)
     {
-        expressions.Push(OperatorFunctions[token.Representation](expressions));
+        switch (token.Operator)
+        {
+            case Operator.And:
+                expressions.Push(And(expressions));
+                break;
+            case Operator.Or:
+                expressions.Push(Or(expressions));
+                break;
+            case Operator.Not:
+                expressions.Push(Not(expressions));
+                break;
+            case Operator.Eq:
+                expressions.Push(Eq(expressions));
+                break;
+            case Operator.Neq:
+                expressions.Push(Neq(expressions));
+                break;
+            case Operator.Lt:
+                expressions.Push(Lt(expressions));
+                break;
+            case Operator.Leq:
+                expressions.Push(Leq(expressions));
+                break;
+            case Operator.Gt:
+                expressions.Push(Gt(expressions));
+                break;
+            case Operator.Geq:
+                expressions.Push(Geq(expressions));
+                break;
+            case Operator.Contains:
+                expressions.Push(Contains(expressions));
+                break;
+            case Operator.StartsWith:
+                expressions.Push(StartsWith(expressions));
+                break;
+            case Operator.EndsWith:
+                expressions.Push(EndsWith(expressions));
+                break;
+        }
     }
 
     // Обработка ключевого слова

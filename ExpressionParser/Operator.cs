@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace ExpressionParser;
+﻿namespace ExpressionParser;
 
 internal enum Operator
 {
+    None,
     And,
     Or,
     Not,
