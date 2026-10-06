@@ -171,16 +171,17 @@ public class ExpressionParserTests : IAsyncLifetime
     [Fact]
     public void InternalDictionaries_InvokeDirectMethodsAndFallbacks()
     {
-        // ToNullableStringConstantExpression via dictionary
-        var dictField = typeof(ExpressionParser).GetField("IdentifierTypeConstantExpressions", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var dict = (Dictionary<string, Func<ConstantExpression, ConstantExpression>>)dictField.GetValue(null)!;
-        
-        var nullableStringRes = dict["Nullable`1String"](Expression.Constant("someString"));
+        var methodInfo = typeof(ExpressionParser).GetMethod("GetConstantExpressionByTypeCode", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var getConstantExpressionByTypeCode = (Func<Type, Func<ConstantExpression, ConstantExpression>>)Delegate.CreateDelegate(
+            typeof(Func<Type, Func<ConstantExpression, ConstantExpression>>),
+            methodInfo);
+
+        var nullableStringRes = getConstantExpressionByTypeCode(typeof(string))(Expression.Constant("someString"));
         nullableStringRes.Value.Should().Be("someString");
 
         // Int8 and Nullable`1Int8 keys
-        dict["Int8"](Expression.Constant("42")).Value.Should().Be((byte)42);
-        dict["Nullable`1Int8"](Expression.Constant("42")).Value.Should().Be((byte?)42);
+        getConstantExpressionByTypeCode(typeof(byte))(Expression.Constant("42")).Value.Should().Be((byte)42);
+        getConstantExpressionByTypeCode(typeof(byte?))(Expression.Constant("42")).Value.Should().Be((byte?)42);
     }
 
     [Fact]

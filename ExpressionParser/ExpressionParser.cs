@@ -30,23 +30,15 @@ internal static partial class ExpressionParser
         "EndsWith"
     };
 
-    // Поддерживаемые логические константы
-    private static readonly HashSet<string> Literals = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "true",
-        "false"
-    };
-
-    // Поддерживаемые ключевые слова
-    private static readonly HashSet<string> Keywords = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "null"
-    };
-
     // Рефлексивное получение строковых методов для трансляции в SQL
     private static readonly MethodInfo ContainsMethod = typeof(string).GetMethod("Contains", [typeof(string)])!;
     private static readonly MethodInfo StartsWithMethod = typeof(string).GetMethod("StartsWith", [typeof(string)])!;
     private static readonly MethodInfo EndsWithMethod = typeof(string).GetMethod("EndsWith", [typeof(string)])!;
+
+    // Константные выражения для ключевых слов
+    private static readonly ConstantExpression NullConstant = Expression.Constant(null);
+    private static readonly ConstantExpression TrueConstant = Expression.Constant(true, typeof(bool));
+    private static readonly ConstantExpression FalseConstant = Expression.Constant(false, typeof(bool));
 
     // Приоритеты операторов для построения дерева выражений
     private static readonly Dictionary<string, int> Precedence = new(StringComparer.OrdinalIgnoreCase)
@@ -65,22 +57,6 @@ internal static partial class ExpressionParser
         { "Not", 100 }
     };
 
-    // Процедуры обработки токенов в зависимости от их типа
-    private static readonly Dictionary<TokenType, Action<Stack<Expression>, ParameterExpression, Token>> TokenTypeProcedures = new()
-    {
-        { TokenType.Identifier, ProceedIdentifier },
-        { TokenType.Literal, ProceedLiteral },
-        { TokenType.Operator, ProceedOperator },
-        { TokenType.Keyword, ProceedKeyword }
-    };
-
-    // Кешированные константные выражения для булевых литералов
-    private static readonly Dictionary<string, ConstantExpression> LiteralExpressions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "true", Expression.Constant(true, typeof(bool)) },
-        { "false", Expression.Constant(false, typeof(bool)) }
-    };
-
     // Словарь функций построения выражений по операторам
     private static readonly Dictionary<string, Func<Stack<Expression>, Expression>> OperatorFunctions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -96,37 +72,6 @@ internal static partial class ExpressionParser
         { "Contains", Contains },
         { "StartsWith", StartsWith },
         { "EndsWith", EndsWith }
-    };
-
-    // Кешированные константные выражения для ключевых слов
-    private static readonly Dictionary<string, ConstantExpression> KeywordExpressions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "null", Expression.Constant(null) }
-    };
-
-    // Фабрики для конвертации констант во внутренние типы C#
-    private static readonly Dictionary<string, Func<ConstantExpression, ConstantExpression>> IdentifierTypeConstantExpressions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        { "Byte", ToInt8ConstantExpression },
-        { "Nullable`1Byte", ToNullableInt8ConstantExpression },
-        { "Int8", ToInt8ConstantExpression },
-        { "Nullable`1Int8", ToNullableInt8ConstantExpression },
-        { "Int16", ToInt16ConstantExpression },
-        { "Nullable`1Int16", ToNullableInt16ConstantExpression },
-        { "Int32", ToInt32ConstantExpression },
-        { "Nullable`1Int32", ToNullableInt32ConstantExpression },
-        { "Int64", ToInt64ConstantExpression },
-        { "Nullable`1Int64", ToNullableInt64ConstantExpression },
-        { "Double", ToDoubleConstantExpression },
-        { "Nullable`1Double", ToNullableDoubleConstantExpression },
-        { "Decimal", ToDecimalConstantExpression },
-        { "Nullable`1Decimal", ToNullableDecimalConstantExpression },
-        { "DateOnly", ToDateOnlyConstantExpression },
-        { "Nullable`1DateOnly", ToNullableDateOnlyConstantExpression },
-        { "String", ToStringConstantExpression },
-        { "Nullable`1String", ToNullableStringConstantExpression },
-        { "Boolean", ToBooleanConstantExpression },
-        { "Nullable`1Boolean", ToNullableBooleanConstantExpression },
     };
 
     /// <summary>
@@ -157,12 +102,12 @@ internal static partial class ExpressionParser
                 tokens.Enqueue(new Token(representation, TokenType.Literal, LiteralType.Numeric));
             }
             // Если токен — булево значение
-            else if (Literals.Contains(representation))
+            else if (bool.TryParse(representation, out bool boolVal))
             {
                 tokens.Enqueue(new Token(representation, TokenType.Literal, LiteralType.Boolean));
             }
             // Если токен — системное ключевое слово
-            else if (Keywords.Contains(representation))
+            else if (representation.Equals("null", StringComparison.OrdinalIgnoreCase))
             {
                 tokens.Enqueue(new Token(representation, TokenType.Keyword));
             }
@@ -232,7 +177,23 @@ internal static partial class ExpressionParser
         {
             var token = tokens.Dequeue();
             // Вызываем обработчик в зависимости от типа токена
-            TokenTypeProcedures[token.TokenType](expressions, parameter, token);
+            switch (token.TokenType)
+            {
+                case TokenType.Identifier:
+                    ProceedIdentifier(expressions, parameter, token);
+                    break;
+                case TokenType.Literal:
+                    ProceedLiteral(expressions, parameter, token);
+                    break;
+                case TokenType.Operator:
+                    ProceedOperator(expressions, parameter, token);
+                    break;
+                case TokenType.Keyword:
+                    ProceedKeyword(expressions, parameter, token);
+                    break;
+                default:
+                    throw new NotSupportedException($"Unsupported token type: {token.TokenType}.");
+            }
         }
 
         return Expression.Lambda<Func<T, bool>>(expressions.Pop(), parameter);
@@ -254,7 +215,7 @@ internal static partial class ExpressionParser
                 expressions.Push(Expression.Constant(token.Representation));
                 break;
             case LiteralType.Boolean:
-                expressions.Push(LiteralExpressions[token.Representation]);
+                expressions.Push(bool.Parse(token.Representation) ? TrueConstant : FalseConstant);
                 break;
             default:
                 throw new InvalidOperationException(nameof(token.LiteralType));
@@ -270,7 +231,8 @@ internal static partial class ExpressionParser
     // Обработка ключевого слова
     private static void ProceedKeyword(Stack<Expression> expressions, ParameterExpression parameter, Token token)
     {
-        expressions.Push(KeywordExpressions[token.Representation]);
+        // Так как у нас один keyword (null), можно без проверок сразу его добавить
+        expressions.Push(NullConstant);
     }
 
     // Логическое И
@@ -376,6 +338,72 @@ internal static partial class ExpressionParser
         return Expression.Call(exps.left, EndsWithMethod, exps.right);
     }
 
+    private static Func<ConstantExpression, ConstantExpression> GetConstantExpressionByTypeCode(Type type)
+    {
+        var underlying = Nullable.GetUnderlyingType(type);
+        bool isNullable = true;
+
+        if (underlying is null)
+        {
+            underlying = type;
+            isNullable = false;
+        }
+
+        switch (Type.GetTypeCode(underlying))
+        {
+            case TypeCode.Empty:
+                throw new NotImplementedException();
+
+            case TypeCode.Object:
+                {
+                    switch (underlying.Name)
+                    {
+                        case "DateOnly":
+                            return isNullable ? ToNullableDateOnlyConstantExpression : ToDateOnlyConstantExpression;
+
+                        case "TimeOnly":
+                            return isNullable ? ToNullableTimeOnlyConstantExpression : ToTimeOnlyConstantExpression;
+
+                        default:
+                            throw new NotSupportedException($"Unsupported type: {type.FullName}.");
+                    }
+                }
+
+            case TypeCode.Boolean:
+                return isNullable ? ToNullableBooleanConstantExpression : ToBooleanConstantExpression;
+            case TypeCode.Char:
+                return isNullable ? ToNullableCharConstantExpression : ToCharConstantExpression;
+            case TypeCode.SByte:
+                throw new NotImplementedException();
+            case TypeCode.Byte:
+                return isNullable ? ToNullableInt8ConstantExpression : ToInt8ConstantExpression;
+            case TypeCode.Int16:
+                return isNullable ? ToNullableInt16ConstantExpression : ToInt16ConstantExpression;
+            case TypeCode.UInt16:
+                throw new NotImplementedException();
+            case TypeCode.Int32:
+                return isNullable ? ToNullableInt32ConstantExpression : ToInt32ConstantExpression;
+            case TypeCode.UInt32:
+                throw new NotImplementedException();
+            case TypeCode.Int64:
+                return isNullable ? ToNullableInt64ConstantExpression : ToInt64ConstantExpression;
+            case TypeCode.UInt64:
+                throw new NotImplementedException();
+            case TypeCode.Single:
+                throw new NotImplementedException();
+            case TypeCode.Double:
+                return isNullable ? ToNullableDoubleConstantExpression : ToDoubleConstantExpression;
+            case TypeCode.Decimal:
+                return isNullable ? ToNullableDecimalConstantExpression : ToDecimalConstantExpression;
+            case TypeCode.DateTime:
+                return isNullable ? ToNullableDateTimeConstantExpression : ToDateTimeConstantExpression;
+            case TypeCode.String:
+                return isNullable ? ToNullableStringConstantExpression : ToStringConstantExpression;
+            default:
+                throw new NotSupportedException($"Unsupported type: {type.FullName}.");
+        }
+    }
+
     /// <summary>
     /// Автоматическое приведение типов константных выражений к типам свойств C#-класса.
     /// Без этой конвертации EF Core падает при попытке сравнить строку с типом Nullable или числом.
@@ -386,52 +414,68 @@ internal static partial class ExpressionParser
         {
             var constantExpression = (ConstantExpression)right;
 
-            if (left.Type.IsGenericType && left.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            if (constantExpression.Value is null)
             {
-                if (constantExpression.Value is null)
-                {
-                    right = constantExpression;
-                }
-                else
-                {
-                    right = IdentifierTypeConstantExpressions[left.Type.Name + Nullable.GetUnderlyingType(left.Type)!.Name](constantExpression);
-                }
+                right = constantExpression;
             }
             else
             {
-                right = IdentifierTypeConstantExpressions[left.Type.Name](constantExpression);
+                right = GetConstantExpressionByTypeCode(left.Type)(constantExpression);
             }
         }
         else if (right.NodeType == ExpressionType.MemberAccess)
         {
             var constantExpression = (ConstantExpression)left;
 
-            if (right.Type.IsGenericType && right.Type.GetGenericTypeDefinition() == typeof(Nullable<>))
+            if (constantExpression.Value is null)
             {
-                if (constantExpression.Value is null)
-                {
-                    left = constantExpression;
-                }
-                else
-                {
-                    left = IdentifierTypeConstantExpressions[right.Type.Name + Nullable.GetUnderlyingType(right.Type)!.Name](constantExpression);
-                }
+                left = constantExpression;
             }
             else
             {
-                left = IdentifierTypeConstantExpressions[right.Type.Name](constantExpression);
+                left = GetConstantExpressionByTypeCode(right.Type)(constantExpression);
             }
         }
 
         return (left, right);
     }
 
-    // Конвертация в тип byte (Int8)
+    // Конвертация в тип bool
+    private static ConstantExpression ToBooleanConstantExpression(ConstantExpression literal)
+    {
+        return literal;
+    }
+
+    // Конвертация в тип Nullable<bool>
+    private static ConstantExpression ToNullableBooleanConstantExpression(ConstantExpression literal)
+    {
+        object representation = literal.Value!;
+        bool? value = Convert.ToBoolean(representation);
+        return Expression.Constant(value, typeof(bool?));
+    }
+
+    // Конвертация в тип Char
+    private static ConstantExpression ToCharConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        char value = char.Parse(representation);
+        return Expression.Constant(value, typeof(char));
+    }
+
+    // Конвертация в тип Nullable<Char>
+    private static ConstantExpression ToNullableCharConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        char? value = char.Parse(representation);
+        return Expression.Constant(value, typeof(char?));
+    }
+
+    // Конвертация в тип byte
     private static ConstantExpression ToInt8ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
         byte value = byte.Parse(representation);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(byte));
     }
 
     // Конвертация в тип Nullable<byte>
@@ -442,12 +486,12 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(byte?));
     }
 
-    // Конвертация в тип short (Int16)
+    // Конвертация в тип short
     private static ConstantExpression ToInt16ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
         short value = short.Parse(representation);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(short));
     }
 
     // Конвертация в тип Nullable<short>
@@ -458,12 +502,12 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(short?));
     }
 
-    // Конвертация в тип int (Int32)
+    // Конвертация в тип int
     private static ConstantExpression ToInt32ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
         int value = int.Parse(representation);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(int));
     }
 
     // Конвертация в тип Nullable<int>
@@ -474,12 +518,12 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(int?));
     }
 
-    // Конвертация в тип long (Int64)
+    // Конвертация в тип long
     private static ConstantExpression ToInt64ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
         long value = long.Parse(representation);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(long));
     }
 
     // Конвертация в тип Nullable<long>
@@ -495,7 +539,7 @@ internal static partial class ExpressionParser
     {
         string representation = literal.Value!.ToString()!;
         double value = double.Parse(representation, CultureInfo.InvariantCulture);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(double));
     }
 
     // Конвертация в тип Nullable<double>
@@ -511,7 +555,7 @@ internal static partial class ExpressionParser
     {
         string representation = literal.Value!.ToString()!;
         decimal value = decimal.Parse(representation, CultureInfo.InvariantCulture);
-        return Expression.Constant(value);
+        return Expression.Constant(value, typeof(decimal));
     }
 
     // Конвертация в тип Nullable<decimal>
@@ -520,6 +564,22 @@ internal static partial class ExpressionParser
         string representation = literal.Value!.ToString()!;
         decimal? value = decimal.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(decimal?));
+    }
+
+    // Конвертация в тип DateTime
+    private static ConstantExpression ToDateTimeConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        DateTime dateTime = DateTimeOffset.Parse(representation).DateTime;
+        return Expression.Constant(dateTime, typeof(DateTime));
+    }
+
+    // Конвертация в тип Nullable<DateTime>
+    private static ConstantExpression ToNullableDateTimeConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        DateTime? dateTime = DateTimeOffset.Parse(representation).DateTime;
+        return Expression.Constant(dateTime, typeof(DateTime?));
     }
 
     // Конвертация в тип DateOnly
@@ -538,6 +598,22 @@ internal static partial class ExpressionParser
         return Expression.Constant(dateOnly, typeof(DateOnly?));
     }
 
+    // Конвертация в тип TimeOnly
+    private static ConstantExpression ToTimeOnlyConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        TimeOnly timeOnly = TimeOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        return Expression.Constant(timeOnly, typeof(TimeOnly));
+    }
+
+    // Конвертация в тип Nullable<TimeOnly>
+    private static ConstantExpression ToNullableTimeOnlyConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        TimeOnly? timeOnly = TimeOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        return Expression.Constant(timeOnly, typeof(TimeOnly?));
+    }
+
     // Конвертация в тип string
     private static ConstantExpression ToStringConstantExpression(ConstantExpression literal)
     {
@@ -549,20 +625,6 @@ internal static partial class ExpressionParser
     {
         string? representation = literal.Value!.ToString();
         return Expression.Constant(representation);
-    }
-
-    // Конвертация в тип bool
-    private static ConstantExpression ToBooleanConstantExpression(ConstantExpression literal)
-    {
-        return literal;
-    }
-
-    // Конвертация в тип Nullable<bool>
-    private static ConstantExpression ToNullableBooleanConstantExpression(ConstantExpression literal)
-    {
-        object representation = literal.Value!;
-        bool? value = Convert.ToBoolean(representation);
-        return Expression.Constant(value, typeof(bool?));
     }
 
     [GeneratedRegex(@"\b[\p{L}_][\p{L}0-9_]*\b|'(?:''|[^'])*'|[-+]?\d*\.?\d+|[()]", RegexOptions.IgnoreCase)]
