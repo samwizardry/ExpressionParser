@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -109,6 +109,8 @@ internal static class ExpressionParser
     // Фабрики для конвертации констант во внутренние типы C#
     private static readonly Dictionary<string, Func<ConstantExpression, ConstantExpression>> IdentifierTypeConstantExpressions = new(StringComparer.OrdinalIgnoreCase)
     {
+        { "Byte", ToInt8ConstantExpression },
+        { "Nullable`1Byte", ToNullableInt8ConstantExpression },
         { "Int8", ToInt8ConstantExpression },
         { "Nullable`1Int8", ToNullableInt8ConstantExpression },
         { "Int16", ToInt16ConstantExpression },

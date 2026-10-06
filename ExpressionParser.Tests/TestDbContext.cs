@@ -1,13 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExpressionParser.Tests;
-
-internal class User
-{
-    public int Id { get; set; }
-
-    public string Name { get; set; } = null!;
-}
 
 internal class TestDbContext : DbContext
 {
