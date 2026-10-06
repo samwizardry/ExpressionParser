@@ -5,15 +5,13 @@ using System.Text.RegularExpressions;
 
 namespace ExpressionParser;
 
-internal static class ExpressionParser
+internal static partial class ExpressionParser
 {
     // Регулярное выражение для токенизации входной строки выражения
-    private static readonly Regex Tokenizer = new Regex(@"(?:\b)[A-Za-zА-Яа-я_]+(?:\b)|'(?:(?:''|[^'])*)'|[-+]?\d*\.?\d+|[()]",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex s_tokenizerRegex = TokenizerRegex();
 
     // Паттерн для распознавания числовых литералов
-    private static readonly Regex NumberPattern = new Regex(@"[-+]?\d*\.?\d+",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex s_numberRegex = NumberRegex();
 
     // Множество поддерживаемых операторов сравнения и логики
     private static readonly HashSet<string> Operators = new(StringComparer.OrdinalIgnoreCase)
@@ -143,7 +141,7 @@ internal static class ExpressionParser
         // Стек для временного хранения операторов
         var operators = new Stack<Token>();
 
-        foreach (Match match in Tokenizer.Matches(expression))
+        foreach (Match match in s_tokenizerRegex.Matches(expression))
         {
             // Получаем текстовое представление токена
             string representation = match.Value;
@@ -154,7 +152,7 @@ internal static class ExpressionParser
                 tokens.Enqueue(new Token(representation.Substring(1, representation.Length - 2), TokenType.Literal, LiteralType.Character));
             }
             // Если токен — число
-            else if (NumberPattern.IsMatch(representation))
+            else if (s_numberRegex.IsMatch(representation))
             {
                 tokens.Enqueue(new Token(representation, TokenType.Literal, LiteralType.Numeric));
             }
@@ -566,4 +564,11 @@ internal static class ExpressionParser
         bool? value = Convert.ToBoolean(representation);
         return Expression.Constant(value, typeof(bool?));
     }
+
+    [GeneratedRegex(@"\b[\p{L}_][\p{L}0-9_]*\b|'(?:''|[^'])*'|[-+]?\d*\.?\d+|[()]", RegexOptions.IgnoreCase)]
+    private static partial Regex TokenizerRegex();
+
+    [GeneratedRegex(@"^[-+]?\d*\.?\d+$")]
+    private static partial Regex NumberRegex();
+
 }
