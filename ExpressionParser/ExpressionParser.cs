@@ -74,6 +74,12 @@ internal static partial class ExpressionParser
         { "EndsWith", EndsWith }
     };
 
+    [GeneratedRegex(@"\b[\p{L}_][\p{L}0-9_]*\b|'(?:''|[^'])*'|[-+]?\d*\.?\d+|[()]", RegexOptions.IgnoreCase)]
+    private static partial Regex TokenizerRegex();
+
+    [GeneratedRegex(@"^[-+]?\d*\.?\d+$")]
+    private static partial Regex NumberRegex();
+
     /// <summary>
     /// Токенизация выражения с использованием алгоритма Дейкстры (Shunting-Yard)
     /// для перевода инфиксной записи в обратную польскую нотацию (RPN).
@@ -257,7 +263,7 @@ internal static partial class ExpressionParser
         return Expression.Not(expressions.Pop());
     }
 
-    // Оператор Равно (eq)
+    // Оператор Равно
     private static Expression Eq(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -266,7 +272,7 @@ internal static partial class ExpressionParser
         return Expression.Equal(exps.left, exps.right);
     }
 
-    // Оператор Не Равно (ne)
+    // Оператор Не Равно
     private static Expression Neq(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -275,7 +281,7 @@ internal static partial class ExpressionParser
         return Expression.NotEqual(exps.left, exps.right);
     }
 
-    // Оператор Меньше (lt / before)
+    // Оператор Меньше
     private static Expression Lt(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -284,7 +290,7 @@ internal static partial class ExpressionParser
         return Expression.LessThan(exps.left, exps.right);
     }
 
-    // Оператор Меньше или Равно (lte / beforeeq)
+    // Оператор Меньше или Равно
     private static Expression Leq(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -293,7 +299,7 @@ internal static partial class ExpressionParser
         return Expression.LessThanOrEqual(exps.left, exps.right);
     }
 
-    // Оператор Больше (gt / after)
+    // Оператор Больше
     private static Expression Gt(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -302,7 +308,7 @@ internal static partial class ExpressionParser
         return Expression.GreaterThan(exps.left, exps.right);
     }
 
-    // Оператор Больше или Равно (gte / aftereq)
+    // Оператор Больше или Равно
     private static Expression Geq(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -311,7 +317,7 @@ internal static partial class ExpressionParser
         return Expression.GreaterThanOrEqual(exps.left, exps.right);
     }
 
-    // Проверка содержания подстроки (contain)
+    // Проверка содержания подстроки
     private static Expression Contains(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -320,7 +326,7 @@ internal static partial class ExpressionParser
         return Expression.Call(exps.left, ContainsMethod, exps.right);
     }
 
-    // Проверка начала строки (start)
+    // Проверка начала строки
     private static Expression StartsWith(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -329,7 +335,7 @@ internal static partial class ExpressionParser
         return Expression.Call(exps.left, StartsWithMethod, exps.right);
     }
 
-    // Проверка окончания строки (end)
+    // Проверка окончания строки
     private static Expression EndsWith(Stack<Expression> expressions)
     {
         var right = expressions.Pop();
@@ -351,46 +357,37 @@ internal static partial class ExpressionParser
 
         switch (Type.GetTypeCode(underlying))
         {
-            case TypeCode.Empty:
-                throw new NotImplementedException();
+            case TypeCode.Object when underlying == typeof(DateOnly):
+                return isNullable ? ToNullableDateOnlyConstantExpression : ToDateOnlyConstantExpression;
+
+            case TypeCode.Object when underlying == typeof(TimeOnly):
+                return isNullable ? ToNullableTimeOnlyConstantExpression : ToTimeOnlyConstantExpression;
 
             case TypeCode.Object:
-                {
-                    switch (underlying.Name)
-                    {
-                        case "DateOnly":
-                            return isNullable ? ToNullableDateOnlyConstantExpression : ToDateOnlyConstantExpression;
-
-                        case "TimeOnly":
-                            return isNullable ? ToNullableTimeOnlyConstantExpression : ToTimeOnlyConstantExpression;
-
-                        default:
-                            throw new NotSupportedException($"Unsupported type: {type.FullName}.");
-                    }
-                }
+                throw new NotSupportedException($"Unsupported type: {type.FullName}.");
 
             case TypeCode.Boolean:
                 return isNullable ? ToNullableBooleanConstantExpression : ToBooleanConstantExpression;
             case TypeCode.Char:
                 return isNullable ? ToNullableCharConstantExpression : ToCharConstantExpression;
             case TypeCode.SByte:
-                throw new NotImplementedException();
+                return isNullable ? ToNullableSByteConstantExpression : ToSByteConstantExpression;
             case TypeCode.Byte:
                 return isNullable ? ToNullableInt8ConstantExpression : ToInt8ConstantExpression;
             case TypeCode.Int16:
                 return isNullable ? ToNullableInt16ConstantExpression : ToInt16ConstantExpression;
             case TypeCode.UInt16:
-                throw new NotImplementedException();
+                return isNullable ? ToNullableUInt16ConstantExpression : ToUInt16ConstantExpression;
             case TypeCode.Int32:
                 return isNullable ? ToNullableInt32ConstantExpression : ToInt32ConstantExpression;
             case TypeCode.UInt32:
-                throw new NotImplementedException();
+                return isNullable ? ToNullableUInt32ConstantExpression : ToUInt32ConstantExpression;
             case TypeCode.Int64:
                 return isNullable ? ToNullableInt64ConstantExpression : ToInt64ConstantExpression;
             case TypeCode.UInt64:
-                throw new NotImplementedException();
+                return isNullable ? ToNullableUInt64ConstantExpression : ToUInt64ConstantExpression;
             case TypeCode.Single:
-                throw new NotImplementedException();
+                return isNullable ? ToNullableSingleConstantExpression : ToSingleConstantExpression;
             case TypeCode.Double:
                 return isNullable ? ToNullableDoubleConstantExpression : ToDoubleConstantExpression;
             case TypeCode.Decimal:
@@ -412,29 +409,13 @@ internal static partial class ExpressionParser
     {
         if (left.NodeType == ExpressionType.MemberAccess)
         {
-            var constantExpression = (ConstantExpression)right;
-
-            if (constantExpression.Value is null)
-            {
-                right = constantExpression;
-            }
-            else
-            {
-                right = GetConstantExpressionByTypeCode(left.Type)(constantExpression);
-            }
+            ConstantExpression constantExpression = (ConstantExpression)right;
+            right = constantExpression.Value is null ? constantExpression : GetConstantExpressionByTypeCode(left.Type)(constantExpression);
         }
         else if (right.NodeType == ExpressionType.MemberAccess)
         {
-            var constantExpression = (ConstantExpression)left;
-
-            if (constantExpression.Value is null)
-            {
-                left = constantExpression;
-            }
-            else
-            {
-                left = GetConstantExpressionByTypeCode(right.Type)(constantExpression);
-            }
+            ConstantExpression constantExpression = (ConstantExpression)left;
+            left = constantExpression.Value is null ? constantExpression : GetConstantExpressionByTypeCode(right.Type)(constantExpression);
         }
 
         return (left, right);
@@ -470,6 +451,22 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(char?));
     }
 
+    // Конвертация в тип sbyte
+    private static ConstantExpression ToSByteConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        sbyte value = sbyte.Parse(representation);
+        return Expression.Constant(value, typeof(sbyte));
+    }
+
+    // Конвертация в тип Nullable<sbyte>
+    private static ConstantExpression ToNullableSByteConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        sbyte? value = sbyte.Parse(representation);
+        return Expression.Constant(value, typeof(sbyte?));
+    }
+
     // Конвертация в тип byte
     private static ConstantExpression ToInt8ConstantExpression(ConstantExpression literal)
     {
@@ -502,6 +499,22 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(short?));
     }
 
+    // Конвертация в тип ushort
+    private static ConstantExpression ToUInt16ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        ushort value = ushort.Parse(representation);
+        return Expression.Constant(value, typeof(ushort));
+    }
+
+    // Конвертация в тип Nullable<ushort>
+    private static ConstantExpression ToNullableUInt16ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        ushort? value = ushort.Parse(representation);
+        return Expression.Constant(value, typeof(ushort?));
+    }
+
     // Конвертация в тип int
     private static ConstantExpression ToInt32ConstantExpression(ConstantExpression literal)
     {
@@ -518,6 +531,22 @@ internal static partial class ExpressionParser
         return Expression.Constant(value, typeof(int?));
     }
 
+    // Конвертация в тип uint
+    private static ConstantExpression ToUInt32ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        uint value = uint.Parse(representation);
+        return Expression.Constant(value, typeof(uint));
+    }
+
+    // Конвертация в тип Nullable<uint>
+    private static ConstantExpression ToNullableUInt32ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        uint? value = uint.Parse(representation);
+        return Expression.Constant(value, typeof(uint?));
+    }
+
     // Конвертация в тип long
     private static ConstantExpression ToInt64ConstantExpression(ConstantExpression literal)
     {
@@ -532,6 +561,38 @@ internal static partial class ExpressionParser
         string representation = literal.Value!.ToString()!;
         long? value = long.Parse(representation);
         return Expression.Constant(value, typeof(long?));
+    }
+
+    // Конвертация в тип ulong
+    private static ConstantExpression ToUInt64ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        ulong value = ulong.Parse(representation);
+        return Expression.Constant(value, typeof(ulong));
+    }
+
+    // Конвертация в тип Nullable<ulong>
+    private static ConstantExpression ToNullableUInt64ConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        ulong? value = ulong.Parse(representation);
+        return Expression.Constant(value, typeof(ulong?));
+    }
+
+    // Конвертация в тип float
+    private static ConstantExpression ToSingleConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        float value = float.Parse(representation, CultureInfo.InvariantCulture);
+        return Expression.Constant(value, typeof(float));
+    }
+
+    // Конвертация в тип Nullable<float>
+    private static ConstantExpression ToNullableSingleConstantExpression(ConstantExpression literal)
+    {
+        string representation = literal.Value!.ToString()!;
+        float? value = float.Parse(representation, CultureInfo.InvariantCulture);
+        return Expression.Constant(value, typeof(float?));
     }
 
     // Конвертация в тип double
@@ -626,11 +687,4 @@ internal static partial class ExpressionParser
         string? representation = literal.Value!.ToString();
         return Expression.Constant(representation);
     }
-
-    [GeneratedRegex(@"\b[\p{L}_][\p{L}0-9_]*\b|'(?:''|[^'])*'|[-+]?\d*\.?\d+|[()]", RegexOptions.IgnoreCase)]
-    private static partial Regex TokenizerRegex();
-
-    [GeneratedRegex(@"^[-+]?\d*\.?\d+$")]
-    private static partial Regex NumberRegex();
-
 }
