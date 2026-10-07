@@ -70,7 +70,8 @@ internal static partial class ExpressionParser
             // Если токен — строковый литерал (одинарные кавычки)
             if (representation[0] == '\'' && representation[representation.Length - 1] == '\'')
             {
-                tokens.Enqueue(new Token(representation.Substring(1, representation.Length - 2), TokenType.Literal, LiteralType.Character));
+                string unescaped = representation.Substring(1, representation.Length - 2).Replace("''", "'");
+                tokens.Enqueue(new Token(unescaped, TokenType.Literal, LiteralType.Character));
             }
             // Если токен — число
             else if (s_numberRegex.IsMatch(representation))
@@ -255,7 +256,7 @@ internal static partial class ExpressionParser
     {
         var right = expressions.Pop();
         var left = expressions.Pop();
-        return Expression.And(left, right);
+        return Expression.AndAlso(left, right);
     }
 
     // Логическое ИЛИ
@@ -263,7 +264,7 @@ internal static partial class ExpressionParser
     {
         var right = expressions.Pop();
         var left = expressions.Pop();
-        return Expression.Or(left, right);
+        return Expression.OrElse(left, right);
     }
 
     // Логическое ОТРИЦАНИЕ
@@ -382,7 +383,7 @@ internal static partial class ExpressionParser
             case TypeCode.SByte:
                 return isNullable ? ToNullableSByteConstantExpression : ToSByteConstantExpression;
             case TypeCode.Byte:
-                return isNullable ? ToNullableInt8ConstantExpression : ToInt8ConstantExpression;
+                return isNullable ? ToNullableByteConstantExpression : ToByteConstantExpression;
             case TypeCode.Int16:
                 return isNullable ? ToNullableInt16ConstantExpression : ToInt16ConstantExpression;
             case TypeCode.UInt16:
@@ -416,15 +417,24 @@ internal static partial class ExpressionParser
     /// </summary>
     private static (Expression left, Expression right) ConvertExpressions(Expression left, Expression right)
     {
-        if (left.NodeType == ExpressionType.MemberAccess)
+        if (left.NodeType == ExpressionType.MemberAccess && right is ConstantExpression constRight)
         {
-            ConstantExpression constantExpression = (ConstantExpression)right;
-            right = constantExpression.Value is null ? constantExpression : GetConstantExpressionByTypeCode(left.Type)(constantExpression);
+            right = constRight.Value is null ? constRight : GetConstantExpressionByTypeCode(left.Type)(constRight);
         }
-        else if (right.NodeType == ExpressionType.MemberAccess)
+        else if (right.NodeType == ExpressionType.MemberAccess && left is ConstantExpression constLeft)
         {
-            ConstantExpression constantExpression = (ConstantExpression)left;
-            left = constantExpression.Value is null ? constantExpression : GetConstantExpressionByTypeCode(right.Type)(constantExpression);
+            left = constLeft.Value is null ? constLeft : GetConstantExpressionByTypeCode(right.Type)(constLeft);
+        }
+        else if (left.Type != right.Type)
+        {
+            if (Nullable.GetUnderlyingType(right.Type) == left.Type)
+            {
+                left = Expression.Convert(left, right.Type);
+            }
+            else if (Nullable.GetUnderlyingType(left.Type) == right.Type)
+            {
+                right = Expression.Convert(right, left.Type);
+            }
         }
 
         return (left, right);
@@ -464,7 +474,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToSByteConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        sbyte value = sbyte.Parse(representation);
+        sbyte value = sbyte.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(sbyte));
     }
 
@@ -472,23 +482,23 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableSByteConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        sbyte? value = sbyte.Parse(representation);
+        sbyte? value = sbyte.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(sbyte?));
     }
 
     // Конвертация в тип byte
-    private static ConstantExpression ToInt8ConstantExpression(ConstantExpression literal)
+    private static ConstantExpression ToByteConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        byte value = byte.Parse(representation);
+        byte value = byte.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(byte));
     }
 
     // Конвертация в тип Nullable<byte>
-    private static ConstantExpression ToNullableInt8ConstantExpression(ConstantExpression literal)
+    private static ConstantExpression ToNullableByteConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        byte? value = byte.Parse(representation);
+        byte? value = byte.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(byte?));
     }
 
@@ -496,7 +506,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToInt16ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        short value = short.Parse(representation);
+        short value = short.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(short));
     }
 
@@ -504,7 +514,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableInt16ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        short? value = short.Parse(representation);
+        short? value = short.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(short?));
     }
 
@@ -512,7 +522,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToUInt16ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        ushort value = ushort.Parse(representation);
+        ushort value = ushort.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(ushort));
     }
 
@@ -520,7 +530,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableUInt16ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        ushort? value = ushort.Parse(representation);
+        ushort? value = ushort.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(ushort?));
     }
 
@@ -528,7 +538,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToInt32ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        int value = int.Parse(representation);
+        int value = int.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(int));
     }
 
@@ -536,7 +546,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableInt32ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        int? value = int.Parse(representation);
+        int? value = int.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(int?));
     }
 
@@ -544,7 +554,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToUInt32ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        uint value = uint.Parse(representation);
+        uint value = uint.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(uint));
     }
 
@@ -552,7 +562,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableUInt32ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        uint? value = uint.Parse(representation);
+        uint? value = uint.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(uint?));
     }
 
@@ -560,7 +570,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToInt64ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        long value = long.Parse(representation);
+        long value = long.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(long));
     }
 
@@ -568,7 +578,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableInt64ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        long? value = long.Parse(representation);
+        long? value = long.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(long?));
     }
 
@@ -576,7 +586,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToUInt64ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        ulong value = ulong.Parse(representation);
+        ulong value = ulong.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(ulong));
     }
 
@@ -584,7 +594,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableUInt64ConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        ulong? value = ulong.Parse(representation);
+        ulong? value = ulong.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(value, typeof(ulong?));
     }
 
@@ -640,7 +650,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToDateTimeConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        DateTime dateTime = DateTimeOffset.Parse(representation).DateTime;
+        DateTime dateTime = DateTime.Parse(representation, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
         return Expression.Constant(dateTime, typeof(DateTime));
     }
 
@@ -648,7 +658,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableDateTimeConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        DateTime? dateTime = DateTimeOffset.Parse(representation).DateTime;
+        DateTime? dateTime = DateTime.Parse(representation, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal);
         return Expression.Constant(dateTime, typeof(DateTime?));
     }
 
@@ -656,7 +666,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToDateOnlyConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        DateOnly dateOnly = DateOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        DateOnly dateOnly = DateOnly.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(dateOnly, typeof(DateOnly));
     }
 
@@ -664,7 +674,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableDateOnlyConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        DateOnly? dateOnly = DateOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        DateOnly? dateOnly = DateOnly.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(dateOnly, typeof(DateOnly?));
     }
 
@@ -672,7 +682,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToTimeOnlyConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        TimeOnly timeOnly = TimeOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        TimeOnly timeOnly = TimeOnly.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(timeOnly, typeof(TimeOnly));
     }
 
@@ -680,7 +690,7 @@ internal static partial class ExpressionParser
     private static ConstantExpression ToNullableTimeOnlyConstantExpression(ConstantExpression literal)
     {
         string representation = literal.Value!.ToString()!;
-        TimeOnly? timeOnly = TimeOnly.FromDateTime(DateTimeOffset.Parse(representation).DateTime);
+        TimeOnly? timeOnly = TimeOnly.Parse(representation, CultureInfo.InvariantCulture);
         return Expression.Constant(timeOnly, typeof(TimeOnly?));
     }
 
