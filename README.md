@@ -135,4 +135,4 @@ var completedProfiles = await dbContext.Users
 
 ## License
 
-MIT
+This project is licensed under the [MIT](LICENSE) License.
