@@ -1,9 +1,32 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+
+    <!-- Package Metadata -->
+    <Authors>samwizardry</Authors>
+    <Product>Samwizardry.ExpressionParser</Product>
+    <PackageId>Samwizardry.ExpressionParser</PackageId>
+    <Title>Samwizardry.ExpressionParser</Title>
+    <Description>A lightweight string filter parser that compiles text expressions into strongly-typed LINQ Expression Trees for IQueryable and EF Core.</Description>
+    <PackageTags>expression-parser;linq;expression-tree;dynamic-linq;efcore;entity-framework-core;iqueryable;filter;filtering;query-builder;shunting-yard;predicate;csharp;dotnet;aspnetcore</PackageTags>
+    <PackageProjectUrl>https://github.com/samwizardry/ExpressionParser</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/samwizardry/ExpressionParser</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Symbols & Documentation -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591;1570;1572;1573;1574</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 </Project>
