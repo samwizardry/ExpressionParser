@@ -10,7 +10,7 @@
     <Product>Semisoft.ExpressionParser</Product>
     <PackageId>Semisoft.ExpressionParser</PackageId>
     <Title>Semisoft.ExpressionParser</Title>
-    <Description>A lightweight string filter parser that compiles text expressions into strongly-typed LINQ Expression Trees for IQueryable and EF Core.</Description>
+    <Description>String filter parser that compiles text expressions into strongly-typed LINQ Expression Trees for IQueryable and EF Core.</Description>
     <PackageTags>expression-parser;linq;expression-tree;dynamic-linq;efcore;entity-framework-core;iqueryable;filter;filtering;query-builder;shunting-yard;predicate;csharp;dotnet;aspnetcore</PackageTags>
     <PackageProjectUrl>https://github.com/samwizardry/ExpressionParser</PackageProjectUrl>
     <RepositoryUrl>https://github.com/samwizardry/ExpressionParser</RepositoryUrl>
