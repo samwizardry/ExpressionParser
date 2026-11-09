@@ -1,6 +1,6 @@
 # ExpressionParser
 
-[![NuGet Version](https://img.shields.io/nuget/v/Samwizardry.ExpressionParser.svg)](https://www.nuget.org/packages/Samwizardry.ExpressionParser/)
+[![NuGet Version](https://img.shields.io/nuget/v/Semisoft.ExpressionParser.svg)](https://www.nuget.org/packages/Semisoft.ExpressionParser/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
 
