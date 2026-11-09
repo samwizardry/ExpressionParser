@@ -1,5 +1,9 @@
 # ExpressionParser
 
+[![NuGet Version](https://img.shields.io/nuget/v/Samwizardry.ExpressionParser.svg)](https://www.nuget.org/packages/Samwizardry.ExpressionParser/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
+
 String expression parser for .NET 10 that translates dynamic filter strings into LINQ Expression Trees (`Expression<Func<T, bool>>`) for Entity Framework Core and `IQueryable<T>`.
 
 Built on Dijkstra's **Shunting-Yard algorithm** and compile-time **Regex Source Generators** for minimal overhead and zero third-party runtime dependencies.
