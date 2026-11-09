@@ -1,6 +1,6 @@
 # ExpressionParser
 
-A lightweight, high-performance string expression parser for .NET 10 that translates dynamic filter strings into LINQ Expression Trees (`Expression<Func<T, bool>>`) for Entity Framework Core and `IQueryable<T>`.
+String expression parser for .NET 10 that translates dynamic filter strings into LINQ Expression Trees (`Expression<Func<T, bool>>`) for Entity Framework Core and `IQueryable<T>`.
 
 Built on Dijkstra's **Shunting-Yard algorithm** and compile-time **Regex Source Generators** for minimal overhead and zero third-party runtime dependencies.
 
